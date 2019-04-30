@@ -128,7 +128,6 @@ def get_normalization_matrix(objp, imgp):
         return n.astype(np.float64)
     
     # collect all points into a array
-    num_of_point = len(objp)
     object_normalization_matrix = _normalization(objp)
     image_normalization_matrix = _normalization(imgp)
     
