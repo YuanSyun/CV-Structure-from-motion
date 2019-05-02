@@ -70,7 +70,7 @@ def sort_matched_points(matches, slice_matched_points=None):
         matched_point_order = matched_point_order[:slice_matched_points]
     return matched_point_order
 
-def show_matched_image(imageA, imageB, KeypointsA, KeypointsB, matched_points):
+def show_matched_image(imageA, imageB, KeypointsA, KeypointsB, matched_points, draw_line=True):
     '''
         showing matched points with line
     '''
@@ -91,7 +91,10 @@ def show_matched_image(imageA, imageB, KeypointsA, KeypointsB, matched_points):
         # draw line by cv2.line
         ptA = (int(KeypointsA[indexA].pt[0]), int(KeypointsA[indexA].pt[1]))
         ptB = (int(KeypointsB[indexB].pt[0] + wA), int(KeypointsB[indexB].pt[1]))
-        cv2.line(vis, ptA, ptB, color, 2)
+        cv2.circle(vis, ptA, 5, color, -1)
+        cv2.circle(vis, ptB, 5, color, -1)
+        if (draw_line):
+            cv2.line(vis, ptA, ptB, color, 2)
         
     return vis
 
