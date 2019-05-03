@@ -28,8 +28,14 @@ np.set_printoptions(suppress=True)
 # In[2]:
 
 
-image1 = cv2.imread('./data/Statue1.bmp')
-image2 = cv2.imread('./data/Statue2.bmp')
+DEBUG_IMAGE_INDEX = 1
+
+if(DEBUG_IMAGE_INDEX==1):
+    image1 = cv2.imread('./data/Mesona1.JPG')
+    image2 = cv2.imread('./data/Mesona2.JPG')
+elif(DEBUG_IMAGE_INDEX == 2):
+    image1 = cv2.imread('./data/Statue1.bmp')
+    image2 = cv2.imread('./data/Statue2.bmp')
 image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
 image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
 
@@ -42,8 +48,6 @@ plt.show()
 
 # In[3]:
 
-
-DEBUG_IMAGE_INDEX = 2
 
 intrinsic_matrix1 = np.zeros((3,3))
 intrinsic_matrix1 = np.zeros((3,3))
@@ -115,8 +119,13 @@ def normalization(imgpts1, imgpts2):
     
     num_of_point = len(imgpts1)
     for i in range(num_of_point): 
-        homopts1[i] = np.dot(t1, homopts1[i])
-        homopts2[i] = np.dot(t2, homopts2[i])
+        
+        #最後一項要為1
+        p2h = np.dot(t1, homopts1[i])
+        homopts1[i] = p2h/p2h[-1]
+        
+        p2h1 = np.dot(t2, homopts2[i])
+        homopts2[i] = p2h1/p2h1[-1]
     
     normalpts1 = np.delete(homopts1, -1, axis=1)
     normalpts2 = np.delete(homopts2, -1, axis=1)
@@ -188,7 +197,12 @@ def get_essential_mat(intrinsicmat1, intrinsicmat2, fundamentalmat):
     '''
         ref: Multiple View Geometry 9.12
     '''
-    return np.transpose(intrinsicmat2) * fundamentalmat * intrinsicmat1
+    if(intrinsicmat1[-1,-1] != 1):
+        intrinsicmat1 = intrinsicmat1 / intrinsicmat1[-1,-1]
+    if(intrinsicmat2[-1,-1] != 1):
+        intrinsicmat2 = intrinsicmat2 / intrinsicmat2[-1,-1]
+    
+    return np.dot(np.dot(np.transpose(intrinsicmat2), fundamentalmat), intrinsicmat1)
 
 def find_fundamental_by_RANSAC(matchedpt_order, imgpts1, imgpts2, inliner_threshold):
     '''
@@ -314,33 +328,32 @@ plt.show()
 
 # ## 計算Camera Matrix
 
-# In[7]:
+# In[10]:
 
 
 # first camera matrix (ref: Multiple View Geometry 9.19)
-cammat1 = np.array([[1,0,0,0],
-                           [0,1,0,0],
-                           [0,0,1,0]])
-
 def check_coherent_rotatio(rotation):
     '''
         We can install a check to see if the
         rotation element is a valid rotation matrix. Keeping in mind that rotation matrices must have a
         determinant of 1 (or -1)
     '''
-    if((abs(np.linalg.det(rotation)) - 1.0) > 1e-07):
-        return False
+    if((abs(np.linalg.det(rotation)) - 1.0) > 1e-03):
+        print('This is not a valid rotation matrix')
     return True
 
 def get_camera_matrix(K, R, T):
-    camera_matrix = np.zeros((4, 3))
+    camera_matrix = np.zeros((3, 4))
     if(check_coherent_rotatio(R) == True):
-        e = np.array([[R[0,0], R[0,1], R[0,2], T[0]],
+        camera_matrix = np.array([[R[0,0], R[0,1], R[0,2], T[0]],
                            [R[1,0], R[1,1], R[1,2], T[1]],
                            [R[2,0], R[2,1], R[2,2], T[2]]])
-    return np.dot(K, e)
+    if(K[-1,-1]!=1):
+        K = K/k[-1,-1]
+    #camera_matrix = np.dot(K, camera_matrix)
+    return camera_matrix
 
-_u, _s, _vt = np.linalg.svd(essentialmat)
+_u, _s, _vt = np.linalg.svd(essentialmat_opencv)
 #print("u\n", _u, "\ns\n", _s, "\nvh\n", _vt)
 
 # skew-symmetric (ref: Multiple View Geometry 9.13)
@@ -348,12 +361,22 @@ w = np.array([[0, -1, 0],
               [1, 0, 0], 
               [0, 0, 1]])
 
+ie = np.array([[1,0,0,0],
+               [0,1,0,0],
+               [0,0,1,0]])
+
+I = np.array([[1, 0, 0],
+             [0, 1, 0],
+             [0, 0, 1]])
+cammat1 = get_camera_matrix(intrinsic_matrix1, I, np.zeros((3,1)))
+
 # Thre have four camera direction (ref: Multiple View Geometry 9.14)
 cammat2_1 = get_camera_matrix(intrinsic_matrix1, np.dot(np.dot(_u, w), _vt), _u[:,2])
 cammat2_2 = get_camera_matrix(intrinsic_matrix1, np.dot(np.dot(_u, w), _vt), -_u[:,2])
 cammat2_3 = get_camera_matrix(intrinsic_matrix1, np.dot(np.dot(_u, np.transpose(w)), _vt), _u[:,2])
 cammat2_4 = get_camera_matrix(intrinsic_matrix1, np.dot(np.dot(_u, np.transpose(w)), _vt), -_u[:,2])
 
+print("camera matrix1\n", cammat1)
 print("camera matrix2 1\n", cammat2_1)
 print("camera matrix2 2\n", cammat2_2)
 print("camera matrix2 3\n", cammat2_3)
@@ -362,7 +385,7 @@ print("camera matrix2 4\n", cammat2_4)
 
 # ## 將像素對應到三維空間
 
-# In[8]:
+# In[11]:
 
 
 def linear_LS_Triangulation(x1, camera_matrix1, x2, camera_matrix2):
@@ -406,20 +429,25 @@ def iterative_linear_LS_triangulation(u, p, u1, p1):
             break
         
         # reweight equations and SVD
-        A = np.array([[(np.dot(u[0], p[2,0]) - p[0,0])/wi, (np.dot(u[0], p[2,1]) - p[0,1])/wi, (np.dot(u[0], p[2,2]) - p[0,2])/wi],
-                     [(np.dot(u[1], p[2,0]) - p[1,0])/wi, (np.dot(u[1], p[2,1]) - p[1,1])/wi, (np.dot(u[1], p[2,2]) - p[1,2])/wi],
-                     [(np.dot(u1[0], p1[2,0]) - p1[0,0])/wi1, (np.dot(u1[0], p1[2,1]) - p1[0,1])/wi1, (np.dot(u1[0], p1[2,2]) - p1[0,2])/wi1],
-                     [(np.dot(u1[1], p1[2,0]) - p1[1,0])/wi1, (np.dot(u1[1], p1[2,1]) - p1[1,1])/wi1, (np.dot(u1[1], p1[2,2]) - p1[1,2])/wi1]])
+        A = np.array([[(u[0]*p[2,0] - p[0,0])/wi, (u[0]*p[2,1] - p[0,1])/wi, (u[0]*p[2,2] - p[0,2])/wi],
+                     [(u[1]*p[2,0] - p[1,0])/wi, (u[1]*p[2,1] - p[1,1])/wi, (u[1]*p[2,2] - p[1,2])/wi],
+                     [(u1[0]*p1[2,0] - p1[0,0])/wi1, (u1[0]*p1[2,1] - p1[0,1])/wi1, (u1[0]*p1[2,2] - p1[0,2])/wi1],
+                     [(u1[1]*p1[2,0] - p1[1,0])/wi1, (u1[1]*p1[2,1] - p1[1,1])/wi1, (u1[1]*p1[2,2] - p1[1,2])/wi1]])
                       
-        B = np.array([-(np.dot(u[0], p[2,3]) - p[0,3])/wi,
-                     -(np.dot(u[1], p[2,3]) - p[1,3])/wi,
-                     -(np.dot(u1[0], p1[2,3]) - p1[0,3])/wi1,
-                     -(np.dot(u1[1], p1[2,3]) - p1[1,3])/wi1])
+        B = np.array([-(u[0]*p[2,3] - p[0,3])/wi,
+                     -(u[1]*p[2,3] - p[1,3])/wi,
+                     -(u1[0]*p1[2,3] - p1[0,3])/wi1,
+                     -(u1[1]*p1[2,3] - p1[1,3])/wi1])
         state, aX = cv2.solve(A, B, flags=cv2.DECOMP_SVD)
         X = np.array([aX[0], aX[1], aX[2], 1])
     return X
                       
 def triangulate_points(keypts1, keypts2, kinv, kinv1, p, p1):
+    
+    if(kinv[-1,-1] != 1):
+        kinv = kinv/kinv[-1,-1]
+    if(kinv1[-1,-1] != 1):
+        kinv1 = kinv1/kinv1[-1,-1]
     
     points = np.zeros((len(keypts1), 3))
     for i in range(len(keypts1)):
@@ -462,7 +490,7 @@ show_cloud_points(cloudpts4)
 
 # ## 測試第二圖
 
-# In[12]:
+# In[9]:
 
 
 image3 = cv2.imread('./data/Statue1.bmp')
@@ -485,18 +513,6 @@ matched_feature_image = hw3.show_matched_image(image3, image4, keypt3, keypt4, m
 plt.imshow(matched_feature_image), plt.axis('off'), plt.show()
 imgpts3, imgpts4 = hw3.get_matched_points(matched_pt_order2, keypt3, keypt4)
 
-def get_second_data_cameramat(k, r, t):
-    '''
-        ref: HW4 lecture page 6
-    '''
-    T = -np.dot(r, t)
-    e = np.array([[r[0,0], r[0,1], r[0,2], T[0]],
-              [r[1,0], r[1,1], r[1,2], T[1]],
-              [r[2,0], r[2,1], r[2,2], T[2]]])
-    C = np.dot(k, e)
-    C = C/C[-1,-1]
-    return C
-
 k3 = np.array([[5426.566895, 0.678017, 330.096680],
              [0.000000, 5423.133301, 648.950012],
              [0.000000, 0.000000, 1.000000]])
@@ -504,7 +520,7 @@ r3 = np.array([[0.140626, 0.989027, -0.045273],
               [0.475766, -0.107607, -0.872965],
               [-0.868258, 0.101223, -0.485678]])
 t3 = np.array([67.479439, -6.020049, 40.224911])
-cammat3 = get_second_data_cameramat(k3, r3, t3)
+cammat3 = get_camera_matrix(k3, r3, -np.dot(r3, t3))
 print("cammat3\n", cammat3)
 
 k4 = np.array([[5426.566895, 0.678017, 387.430023],
@@ -514,7 +530,7 @@ r4 = np.array([[0.336455, 0.940689, -0.043627],
               [0.446741, -0.200225, -0.871970],
               [-0.828988, 0.273889, -0.487611]])
 t4 = np.array([62.882744, -21.081516, 40.544052])
-cammat4 = get_second_data_cameramat(k4, r4, t4)
+cammat4 = get_camera_matrix(k4, r4, -np.dot(r4, t4))
 print("cammat4\n", cammat4)
 
 cloudpts = triangulate_points(imgpts3, imgpts4, np.linalg.inv(k3), np.linalg.inv(k4), cammat3, cammat4)
