@@ -14,9 +14,9 @@ switch index
         image_name = './data/our.jpg';
 end
 
-three_d_filename = "./data/three_d_points_"+file_name+".csv";
-two_d_filename = "./data/two_d_points_"+file_name+".csv";
-camera_matrix_filename = "./data/camera_matrix_"+file_name+".csv";
+three_d_filename = "./results/three_d_points_"+file_name+".csv";
+two_d_filename = "./results/two_d_points_"+file_name+".csv";
+camera_matrix_filename = "./results/camera_matrix_"+file_name+".csv";
 
 three_d_points = csvread(three_d_filename);
 two_d_points = csvread(two_d_filename);

@@ -34,7 +34,8 @@ RANSAC_SAMPLE_NUMBER = 2000
 if(DEBUG_IMAGE_INDEX==1):
     image1 = cv2.imread('./data/Mesona1.JPG')
     image2 = cv2.imread('./data/Mesona2.JPG')
-    RANSAC_INLINER_THRESHOLD = 0.5
+    RANSAC_SAMPLE_NUMBER = 5000
+    RANSAC_INLINER_THRESHOLD = 0.35
 elif(DEBUG_IMAGE_INDEX == 2):
     image1 = cv2.imread('./data/Statue1.bmp')
     image2 = cv2.imread('./data/Statue2.bmp')
@@ -535,7 +536,8 @@ cv_inlinerpts1 = get_cv_projectpts(inlinerpts1)
 cv_inlinerpts2 = get_cv_projectpts(inlinerpts2)
 cloudpts1_cv = cv2.triangulatePoints(p1, p2, cv_inlinerpts1, cv_inlinerpts2)
 
-show_cloud_points(project_pts, cloudpts1_cv)
+#show_cloud_points(project_pts, cloudpts1_cv)
+show_cloud_points(project_pts)
 
 
 # ## Save Data For MatLab
