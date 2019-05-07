@@ -10,7 +10,7 @@
 # - multiple view geometry in computer vision
 # http://cvrs.whu.edu.cn/downloads/ebooks/Multiple%20View%20Geometry%20in%20Computer%20Vision%20(Second%20Edition).pdf
 
-# In[168]:
+# In[257]:
 
 
 import numpy as np
@@ -25,26 +25,42 @@ np.set_printoptions(suppress=True)
 
 # ## Input Images
 
-# In[169]:
+# In[258]:
 
 
+'''
+    1 = firset TA image
+    2 = second TA image
+    3 = our images
+'''
 DEBUG_IMAGE_INDEX = 1
 RANSAC_INLINER_THRESHOLD = 0.000003
 RANSAC_SAMPLE_NUMBER = 2000
+RANSAC_SEED = None
+BF_MACTHER_DISTANCE = 0.65
 
 if(DEBUG_IMAGE_INDEX==1):
     image1 = cv2.imread('./data/Mesona1.JPG')
     image2 = cv2.imread('./data/Mesona2.JPG')
+    RANSAC_INLINER_THRESHOLD = 0.0008
+    RANSAC_SEED = 4096
 elif(DEBUG_IMAGE_INDEX == 2):
     image1 = cv2.imread('./data/Statue1.bmp')
     image2 = cv2.imread('./data/Statue2.bmp')
+    RANSAC_SEED = 100
+elif(DEBUG_IMAGE_INDEX == 3):
+    image1 = cv2.imread('./data/beautiful box_01.jpg')
+    image2 = cv2.imread('./data/beautiful box_02.jpg')
+    RANSAC_SEED = 150
+    BF_MACTHER_DISTANCE = 0.3
+    
 image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
 image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
 
 
 # ## Intrinsic Matrix
 
-# In[170]:
+# In[259]:
 
 
 intrinsic_matrix1 = np.zeros((3,3))
@@ -58,7 +74,7 @@ if(DEBUG_IMAGE_INDEX == 1):
                                   [0, 0, 0.0010]])
     intrinsic_matrix1 = intrinsic_matrix1 / intrinsic_matrix1[2,2]
     intrinsic_matrix2 = intrinsic_matrix1
-else:
+elif(DEBUG_IMAGE_INDEX == 2):
     intrinsic_matrix1 = np.array([[5426.566895, 0.678017, 330.096680],
                  [0.000000, 5423.133301, 648.950012],
                  [0.000000, 0.000000, 1.000000]])
@@ -74,6 +90,13 @@ else:
               [0.446741, -0.200225, -0.871970],
               [-0.828988, 0.273889, -0.487611]])
     transform_matrix2 = np.array([62.882744, -21.081516, 40.544052])
+elif(DEBUG_IMAGE_INDEX == 3):
+    
+    intrinsic_matrix1 = np.array([[ 3231.68357701,0.,2047.32909756],
+                                  [0.,3232.96464873,1469.02227927],
+                                  [0.,0.,1.]])
+    intrinsic_matrix1 = intrinsic_matrix1 / intrinsic_matrix1[2,2]
+    intrinsic_matrix2 = intrinsic_matrix1
     
 print("Intrinsic Matrix 1\n", intrinsic_matrix1)
 print("Intrinsic Matrix 2\n", intrinsic_matrix2)
@@ -87,7 +110,7 @@ if(rotation_matrix1 is not None):
 
 # ## Feature Points
 
-# In[171]:
+# In[260]:
 
 
 def get_feature_points(img1, img2):
@@ -95,43 +118,22 @@ def get_feature_points(img1, img2):
 
     (kp1, des1) = sift.detectAndCompute(image1, None)
     (kp2, des2) = sift.detectAndCompute(image2, None)
-
-    BF_MACTHER_DISTANCE = 0.65
+    
     matches = hw3.brute_force_matcher(des1, des2, BF_MACTHER_DISTANCE)
     matched_pt_order = hw3.sort_matched_points(matches)
     imgpts1, imgpts2 = hw3.get_matched_points(matched_pt_order, kp1, kp2)
-    
-    # FLANN parameters
-#     FLANN_INDEX_KDTREE = 0
-#     index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-#     search_params = dict(checks=50)
-    
-#     flann = cv2.FlannBasedMatcher(index_params,search_params)
-#     matches = flann.knnMatch(des1,des2,k=2)
-    
-#     good = []
-#     pts1 = np.zeros((len(matches), 2), dtype=np.float64)
-#     pts2 = np.zeros((len(matches), 2), dtype=np.float64)
-    
-#     # ratio test as per Lowe's paper
-#     for i,(m,n) in enumerate(matches):
-#         if m.distance < 0.8*n.distance:
-#             good.append(m)
-#             pts1[i] = (kp1[m.queryIdx].pt)
-#             pts2[i] = (kp2[m.trainIdx].pt)
-            
-#     return pts1,pts2,good
     
     return imgpts1, imgpts2
 
 imgpts1, imgpts2 = get_feature_points(image1, image2)
 matched_feature_image = hw3.show_matched_image(image1, image2, imgpts1, imgpts2, draw_line=False, circle_size=10)
+fig = plt.figure(figsize=(15,10))
 plt.imshow(matched_feature_image), plt.axis('off'), plt.show()
 
 
 # ## Fundamental and Essential Matrix
 
-# In[172]:
+# In[261]:
 
 
 def get_normalization_matrix(img_shape):
@@ -170,7 +172,11 @@ def normalization(imgpts1, imgpts2, img1, img2):
     
     return normalpts1, normalpts2, t1, t2
 
-def sample_points(pointA, pointB, sample_number):
+def sample_points(pointA, pointB, sample_number, random_seed=None):
+    
+    if(random_seed is not None):
+        random.seed(random_seed)
+    
     sample_point_index = random.sample(range(pointA.shape[0]), sample_number)
     sample_pointsA = np.zeros((sample_number,2))
     sample_pointsB = np.zeros((sample_number,2))
@@ -268,7 +274,7 @@ def get_essential_mat(K1, K2, F):
     
     return E
 
-def find_fundamental_by_RANSAC(imgpts1, imgpts2, img1, img2, inliner_threshold, ransac_iteration = 2000):
+def find_fundamental_by_RANSAC(imgpts1, imgpts2, img1, img2, inliner_threshold, ransac_iteration = 2000, random_seed = None):
     '''
         ref: Multiple View Geometry 11.6
     '''
@@ -286,7 +292,7 @@ def find_fundamental_by_RANSAC(imgpts1, imgpts2, img1, img2, inliner_threshold, 
     
     for i in range(ransac_iteration):
         
-        sampts1, sampts2 = sample_points(normalpts1, normalpts2, ransac_sample_number)
+        sampts1, sampts2 = sample_points(normalpts1, normalpts2, ransac_sample_number, random_seed)
         unnormalized_f = get_fundamental(sampts1, sampts2)
         error, inlinernum, inlinerpt_indexs = get_geometric_error(normalpts1, normalpts2, unnormalized_f, inliner_threshold)
         
@@ -307,11 +313,11 @@ def find_fundamental_by_RANSAC(imgpts1, imgpts2, img1, img2, inliner_threshold, 
     return best_fundamental, best_essential, best_inlinerpts1, best_inlinerpts2 
 
 
-# In[173]:
+# In[262]:
 
 
 # find the fundamnetal matrix
-fundamentalmat, essentialmat, inlinerpts1, inlinerpts2 = find_fundamental_by_RANSAC(imgpts1, imgpts2, image1, image2, RANSAC_INLINER_THRESHOLD, RANSAC_SAMPLE_NUMBER)
+fundamentalmat, essentialmat, inlinerpts1, inlinerpts2 = find_fundamental_by_RANSAC(imgpts1, imgpts2, image1, image2, RANSAC_INLINER_THRESHOLD, RANSAC_SAMPLE_NUMBER, RANSAC_SEED)
 
 print('keypts1.shape\n', imgpts1.shape)
 print("F\n", fundamentalmat)
@@ -329,7 +335,7 @@ print("E by opencv\n", essentialmat_opencv)
 
 # ## Draw Epipolar Lines
 
-# In[174]:
+# In[263]:
 
 
 def compute_correspond_epilines(keypts, which_image, fundamental):
@@ -415,7 +421,7 @@ plt.show()
 # 
 # translation matrix = t = 1x3
 
-# In[175]:
+# In[264]:
 
 
 def combine_external(r, t):
@@ -592,41 +598,17 @@ project_pts, p1, p2 = triangulate_points(essentialmat,
                                          transform_matrix1, transform_matrix2)
 
 # opencv triagulate method, need transform the format of inliner points
-# cv_inlinerpts1 = get_cv_projectpts(inlinerpts1)
-# cv_inlinerpts2 = get_cv_projectpts(inlinerpts2)
-# cloudpts1_cv = cv2.triangulatePoints(p1, p2, cv_inlinerpts1, cv_inlinerpts2)
+cv_inlinerpts1 = get_cv_projectpts(inlinerpts1)
+cv_inlinerpts2 = get_cv_projectpts(inlinerpts2)
+cloudpts1_cv = cv2.triangulatePoints(p1, p2, cv_inlinerpts1, cv_inlinerpts2)
 
 #show_cloud_points(project_pts, cloudpts1_cv)
 show_cloud_points('3D reconstructed', project_pts)
 
 
-# In[176]:
-
-
-import answer
-
-a_x1, a_x2, _ = answer.sift_detector(image1, image2)
-
-a_x1 = np.float64(a_x1)
-a_x2 = np.float64(a_x2)
-
-# normalization the key points
-normalpts1, normalpts2, nomalmat1, normalmat2 = answer.get_normalize(a_x1, a_x2, image1.shape, image2.shape)
-answer_f, mask = answer.get_fundamental(normalpts1, normalpts2, nomalmat1, normalmat2)
-print('anser f\n', answer_f)
-
-anser_e = get_essential_mat(intrinsic_matrix1, intrinsic_matrix2, answer_f)
-
-a_inlinerpts1 = a_x1[mask.ravel()==1]
-a_inlinerpts2 = a_x2[mask.ravel()==1]
-X = answer.cal_P(anser_e, a_inlinerpts1, a_inlinerpts2, intrinsic_matrix1, intrinsic_matrix2)
-
-show_cloud_points('answer', X)
-
-
 # ## Save Data For MatLab
 
-# In[177]:
+# In[265]:
 
 
 file_name = ''

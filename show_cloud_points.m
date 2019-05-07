@@ -1,6 +1,6 @@
 function show_cloud_points()
 
-index = 1;
+index = 3;
 
 switch index
     case{1}
@@ -11,7 +11,7 @@ switch index
         image_name = './data/Statue1.bmp';
     case{3}
         file_name = 'our';
-        image_name = './data/our.jpg';
+        image_name = './data/beautiful box_01.jpg';
 end
 
 three_d_filename = "./results/three_d_points_"+file_name+".csv";
