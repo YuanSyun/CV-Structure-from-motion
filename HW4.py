@@ -10,7 +10,7 @@
 # - multiple view geometry in computer vision
 # http://cvrs.whu.edu.cn/downloads/ebooks/Multiple%20View%20Geometry%20in%20Computer%20Vision%20(Second%20Edition).pdf
 
-# In[257]:
+# In[10]:
 
 
 import numpy as np
@@ -25,7 +25,7 @@ np.set_printoptions(suppress=True)
 
 # ## Input Images
 
-# In[258]:
+# In[11]:
 
 
 '''
@@ -42,16 +42,12 @@ BF_MACTHER_DISTANCE = 0.65
 if(DEBUG_IMAGE_INDEX==1):
     image1 = cv2.imread('./data/Mesona1.JPG')
     image2 = cv2.imread('./data/Mesona2.JPG')
-    RANSAC_INLINER_THRESHOLD = 0.0008
-    RANSAC_SEED = 4096
 elif(DEBUG_IMAGE_INDEX == 2):
     image1 = cv2.imread('./data/Statue1.bmp')
     image2 = cv2.imread('./data/Statue2.bmp')
-    RANSAC_SEED = 100
 elif(DEBUG_IMAGE_INDEX == 3):
     image1 = cv2.imread('./data/beautiful box_01.jpg')
     image2 = cv2.imread('./data/beautiful box_02.jpg')
-    RANSAC_SEED = 150
     BF_MACTHER_DISTANCE = 0.3
     
 image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
@@ -60,7 +56,7 @@ image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
 
 # ## Intrinsic Matrix
 
-# In[259]:
+# In[12]:
 
 
 intrinsic_matrix1 = np.zeros((3,3))
@@ -110,7 +106,7 @@ if(rotation_matrix1 is not None):
 
 # ## Feature Points
 
-# In[260]:
+# In[13]:
 
 
 def get_feature_points(img1, img2):
@@ -133,7 +129,7 @@ plt.imshow(matched_feature_image), plt.axis('off'), plt.show()
 
 # ## Fundamental and Essential Matrix
 
-# In[261]:
+# In[14]:
 
 
 def get_normalization_matrix(img_shape):
@@ -313,7 +309,7 @@ def find_fundamental_by_RANSAC(imgpts1, imgpts2, img1, img2, inliner_threshold, 
     return best_fundamental, best_essential, best_inlinerpts1, best_inlinerpts2 
 
 
-# In[262]:
+# In[15]:
 
 
 # find the fundamnetal matrix
@@ -335,7 +331,7 @@ print("E by opencv\n", essentialmat_opencv)
 
 # ## Draw Epipolar Lines
 
-# In[263]:
+# In[16]:
 
 
 def compute_correspond_epilines(keypts, which_image, fundamental):
@@ -421,7 +417,7 @@ plt.show()
 # 
 # translation matrix = t = 1x3
 
-# In[264]:
+# In[17]:
 
 
 def combine_external(r, t):
@@ -608,7 +604,7 @@ show_cloud_points('3D reconstructed', project_pts)
 
 # ## Save Data For MatLab
 
-# In[265]:
+# In[18]:
 
 
 file_name = ''
